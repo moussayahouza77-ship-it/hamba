@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+  <article>
+    <h2>{{ post.titre }}</h2>
+    <div class="meta">Par {{ post.auteur.username }} — {{ post.date_creation|date:'SHORT_DATETIME_FORMAT' }}</div>
+    <div class="content">{{ post.contenu|linebreaks }}</div>
+    {% if post.thumbnail_url %}
+      <img src="{{ post.thumbnail_url }}" alt="{{ post.titre }}" style="max-width:100%; margin-top:0.75rem; border-radius:8px;"/>
+    {% elif post.image %}
+      <img src="{{ post.image.url }}" alt="{{ post.titre }}" style="max-width:100%; margin-top:0.75rem; border-radius:8px;"/>
+    {% endif %}
+    <div class="post-actions">
+      <button class="like-btn {% if post_liked %}liked{% endif %}" data-post-id="{{ post.pk }}" aria-pressed="{% if post_liked %}true{% else %}false{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.35-9.33-6.28C.9 12.9 2 7.84 6.6 6.02 9.04 4.98 11.4 6.1 12 7.3c.6-1.2 2.96-2.32 5.4-1.28C22 7.84 23.1 12.9 21.33 14.72 19 16.65 12 21 12 21z"/></svg>
+        <span>J'aime</span>
+      </button>
+      <span class="like-count" id="post-like-count-{{ post.pk }}">{{ post.like_count }}</span>
+    </div>
+  </article>
+
+  <section id="comments">
+    <h3>Commentaires</h3>
+    {% for comment in comments %}
+      <div class="comment">
+        <p><strong>{{ comment.auteur.username }}</strong> — <small>{{ comment.date_creation|date:'SHORT_DATETIME_FORMAT' }}</small></p>
+        <p>{{ comment.contenu }}</p>
+        <p>
+          <a href="#reply-{{ comment.pk }}" class="reply-link">Répondre</a>
+          <button class="like-btn comment-like {% if comment.pk in comment_liked_ids %}liked{% endif %}" data-comment-id="{{ comment.pk }}" aria-pressed="{% if comment.pk in comment_liked_ids %}true{% else %}false{% endif %}">❤</button>
+          <span class="like-count" id="comment-like-count-{{ comment.pk }}">{{ comment.like_set.count }}</span>
+        </p>
+        {% for child in comment.children.all %}
+          <div class="comment reply">
+            <p><strong>{{ child.auteur.username }}</strong> — <small>{{ child.date_creation|date:'SHORT_DATETIME_FORMAT' }}</small></p>
+            <p>{{ child.contenu }}</p>
+          </div>
+        {% endfor %}
+        <form id="reply-{{ comment.pk }}" method="post" style="display:none; margin-left:1rem;">
+          {% csrf_token %}
+          <input type="hidden" name="parent" value="{{ comment.pk }}">
+          {{ form.as_p }}
+          <button type="submit">Envoyer la réponse</button>
+        </form>
+      </div>
+    {% empty %}
+      <p>Aucun commentaire.</p>
+    {% endfor %}
+
+    <h4>Ajouter un commentaire</h4>
+    {% if user.is_authenticated %}
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Envoyer</button>
+      </form>
+    {% else %}
+      <p>Veuillez vous <a href="{% url 'accounts:login' %}">connecter</a> pour commenter.</p>
+    {% endif %}
+  </section>
+
+  <script>
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    document.querySelectorAll('.reply-link').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        var id = this.getAttribute('href').replace('#','');
+        var f = document.getElementById(id);
+        if(f.style.display === 'none') f.style.display = 'block'; else f.style.display = 'none';
+      })
+    })
+
+    // Like buttons: toggle visual state and update counts
+    document.querySelectorAll('.like-btn').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        const postId = this.dataset.postId;
+        const commentId = this.dataset.commentId;
+        const csrftoken = getCookie('csrftoken');
+        const data = new URLSearchParams();
+        if(postId) data.append('post_id', postId);
+        if(commentId) data.append('comment_id', commentId);
+        const self = this;
+
+        fetch('/comments/like-toggle/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: data.toString()
+        }).then(r=>{
+          if(!r.ok) throw new Error('Network response not ok');
+          return r.json();
+        }).then(json=>{
+          if(json.count !== undefined){
+            // update count
+            if(postId){
+              document.getElementById('post-like-count-'+postId).textContent = json.count;
+            }
+            if(commentId){
+              document.getElementById('comment-like-count-'+commentId).textContent = json.count;
+            }
+            // toggle visual state
+            if(json.liked){
+              self.classList.add('liked');
+              self.setAttribute('aria-pressed','true');
+            } else {
+              self.classList.remove('liked');
+              self.setAttribute('aria-pressed','false');
+            }
+          }
+        }).catch(err=>{
+          console.error(err);
+          // optionally show an inline error
+        });
+      });
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="container">
+    <div class="card">
+      <h2>{% if create %}Créer une publication{% else %}Modifier la publication{% endif %}</h2>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">{% if create %}Créer{% else %}Enregistrer{% endif %}</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

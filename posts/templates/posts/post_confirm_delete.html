@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="container">
+    <div class="card">
+      <h2>Supprimer la publication</h2>
+      <p>Voulez-vous vraiment supprimer "{{ post.titre }}" ?</p>
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit">Supprimer</button>
+        <a href="{% url 'posts:detail' post.pk %}">Annuler</a>
+      </form>
+    </div>
+  </div>
+{% endblock %}
